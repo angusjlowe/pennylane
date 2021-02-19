@@ -11,33 +11,34 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Gradient descent optimizer"""
+"""Simultaneous perturbation stochastic approximation"""
 
 import autograd
 from pennylane.utils import _flatten, unflatten
+import numpy as np
 
 
 class SPSAOptimizer:
-    # TODO: docstring
-    r"""Basic gradient-descent optimizer.
+    r"""SPSA algorithm which uses small perturbations of the objective
+    function in order to approximate the gradient.
 
-    Base class for other gradient-descent-based optimizers.
-
-    A step of the gradient descent optimizer computes the new values via the rule
+    A step of the SPSA optimizer computes the new values via the rule
 
     .. math::
 
-        x^{(t+1)} = x^{(t)} - \eta \nabla f(x^{(t)}).
+        x^{(t+1)} = x^{(t)} -  a_t g_t(x^{(t)}).
 
-    where :math:`\eta` is a user-defined hyperparameter corresponding to step size.
+    where :math:`a_t` is a hyperparameter corresponding to step size with a
+    user-defined initial value :math:`a` and :math:`g_t(\cdot)` is an
+    estimate of the gradient obtained by simultaneous perturbation.
 
     Args:
         stepsize (float): the user-defined hyperparameter :math:`\eta`
     """
 
-    def __init__(self, stepsize=0.01, alpha=0.602, gamma=0.101):
-        self._stepsize = stepsize
-        self._alpha = alpha
+    def __init__(self,  a=0.602, c=0.101, gamma=0.1):
+        self._a = a
+        self._c = c
         self._gamma = gamma
 
         self._num_step = 1
@@ -77,24 +78,17 @@ class SPSAOptimizer:
         return x_out
 
     @staticmethod
-    def compute_grad(objective_fn, x, grad_fn=None):
-        r"""Compute gradient of the objective_fn at the point x.
+    def estimate_grad(objective_fn, x):
+        r"""Compute gradient estimate of the objective_fn at the point x.
 
         Args:
             objective_fn (function): the objective function for optimization
             x (array): NumPy array containing the current values of the variables to be updated
-            grad_fn (function): Optional gradient function of the
-                objective function with respect to the variables ``x``.
-                If ``None``, the gradient function is computed automatically.
 
         Returns:
-            array: NumPy array containing the gradient :math:`\nabla f(x^{(t)})`
+            array: NumPy array containing the gradient estimate :math:`g(x^{(t)})`
         """
-        if grad_fn is not None:
-            g = grad_fn(x)  # just call the supplied grad function
-        else:
-            # default is autograd
-            g = autograd.grad(objective_fn)(x)  # pylint: disable=no-value-for-parameter
+        g = (objective_fn(x + c * delta) - objective_fn(x - c * delta)) / (2*delta)
         return g
 
     def apply_grad(self, grad, x):
