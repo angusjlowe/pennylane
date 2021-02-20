@@ -26,6 +26,7 @@ from .rms_prop import RMSPropOptimizer
 from .qng import QNGOptimizer
 from .rotosolve import RotosolveOptimizer
 from .rotoselect import RotoselectOptimizer
+from .spsa import SPSAOptimizer
 
 
 # Optimizers to display in the docs
@@ -39,4 +40,5 @@ __all__ = [
     "QNGOptimizer",
     "RotosolveOptimizer",
     "RotoselectOptimizer",
+    "SPSAOptimizer"
 ]

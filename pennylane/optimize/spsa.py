@@ -13,9 +13,8 @@
 # limitations under the License.
 """Simultaneous perturbation stochastic approximation"""
 
-import autograd
 from pennylane.utils import _flatten, unflatten
-import numpy as np
+from scipy.stats import bernoulli
 
 
 class SPSAOptimizer:
@@ -36,24 +35,16 @@ class SPSAOptimizer:
         stepsize (float): the user-defined hyperparameter :math:`\eta`
     """
 
-    def __init__(self,  a=0.602, c=0.101, gamma=0.1):
+    def __init__(self, a=0.02, c=0.01, alpha=0.602, gamma=0.101):
         self._a = a
         self._c = c
         self._gamma = gamma
+        self._alpha = alpha
 
         self._num_step = 1
 
-    def update_stepsize(self, stepsize):
-        r"""Update the initialized stepsize value :math:`\eta`.
 
-        This allows for techniques such as learning rate scheduling.
-
-        Args:
-            stepsize (float): the user-defined hyperparameter :math:`\eta`
-        """
-        self._stepsize = stepsize
-
-    def step(self, objective_fn, x, grad_fn=None):
+    def step(self, objective_fn, x):
         """Update x with one step of the optimizer.
 
         Args:
@@ -67,18 +58,17 @@ class SPSAOptimizer:
             array: the new variable values :math:`x^{(t+1)}`
         """
 
-        ak = a/(self._num_step + A) ** self._alpha
-        ck = c/self._num_step ** self._gamma
+        self._step_size = self._a / (self._num_step ** self._alpha)
+        self._ck = self._c / (self._num_step ** self._gamma)
 
-        g = self.compute_grad(objective_fn, x, grad_fn=grad_fn)
+        g = self.estimate_grad(objective_fn, x)
 
         x_out = self.apply_grad(g, x)
 
         self._num_step += 1
         return x_out
 
-    @staticmethod
-    def estimate_grad(objective_fn, x):
+    def estimate_grad(self, objective_fn, x):
         r"""Compute gradient estimate of the objective_fn at the point x.
 
         Args:
@@ -88,7 +78,8 @@ class SPSAOptimizer:
         Returns:
             array: NumPy array containing the gradient estimate :math:`g(x^{(t)})`
         """
-        g = (objective_fn(x + c * delta) - objective_fn(x - c * delta)) / (2*delta)
+        delta = 2*bernoulli.rvs(0.5, size=x.size) - 1
+        g = (objective_fn(x + self._ck * delta) - objective_fn(x - self._ck * delta)) / (2*self._ck*delta)
         return g
 
     def apply_grad(self, grad, x):
@@ -107,6 +98,6 @@ class SPSAOptimizer:
         x_flat = _flatten(x)
         grad_flat = _flatten(grad)
 
-        x_new_flat = [e - self._stepsize * g for g, e in zip(grad_flat, x_flat)]
+        x_new_flat = [e - self._step_size * g for g, e in zip(grad_flat, x_flat)]
 
         return unflatten(x_new_flat, x)
